@@ -16,5 +16,8 @@ local = ["torch>=2.0"]          # on-device predictors
 koina = ["koinapy>=0.0.10"]     # remote (torch-free, connector-free)
 rt = ["chronologer"]            # default RT backend
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pepdl"]
