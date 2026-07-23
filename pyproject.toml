@@ -11,6 +11,7 @@ license = { text = "MIT" }
 dependencies = ["mscorepy>=0.1.0", "numpy>=1.21", "pandas>=1.3", "scipy>=1.7", "tqdm>=4.6"]
 
 [project.optional-dependencies]
+dev = ["pytest>=8.0"]
 local = ["torch>=2.0"]          # on-device predictors
 koina = ["koinapy>=0.0.10"]     # remote (torch-free, connector-free)
 rt = ["chronologer"]            # default RT backend
