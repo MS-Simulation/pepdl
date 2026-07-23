@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pepdl"
+version = "0.1.0"
+description = "Peptide deep-learning property predictors (CCS, RT, MS2 intensity, charge) — inference. timsTOF-free, torch-optional, backed by mscorepy primitives."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["mscorepy>=0.1.0", "numpy>=1.21", "pandas>=1.3", "scipy>=1.7"]
+
+[project.optional-dependencies]
+local = ["torch>=2.0"]          # on-device predictors
+koina = ["koinapy>=0.0.10"]     # remote (torch-free, connector-free)
+rt = ["chronologer"]            # default RT backend
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pepdl"]
