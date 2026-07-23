@@ -12,9 +12,9 @@ dependencies = ["mscorepy @ git+https://github.com/theGreatHerrLebert/mscore.git
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-local = ["torch>=2.0", "chronologer"]   # on-device predictors incl. the default RT (Chronologer)
+local = ["torch>=2.0", "chronologer @ git+https://github.com/searlelab/chronologer", "pytz"]   # on-device stack incl. the default RT (searlelab Chronologer)
 koina = ["koinapy>=0.0.10"]     # remote (torch-free, connector-free)
-rt = ["chronologer", "torch>=2.0"]       # just the default RT backend (needs torch)
+rt = ["chronologer @ git+https://github.com/searlelab/chronologer", "pytz", "torch>=2.0"]   # just the default RT backend (searlelab Chronologer + torch)
 
 [tool.hatch.metadata]
 allow-direct-references = true
