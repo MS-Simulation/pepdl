@@ -137,8 +137,9 @@ if _TORCH_AVAILABLE:
                 from chronologer.model import initialize_chronologer_model
             except ImportError as e:
                 raise ImportError(
-                    "Chronologer base package not installed. Install from "
-                    "https://github.com/searlelab/chronologer (Apache-2.0)."
+                    "Chronologer (the default local RT model) is not installed. Install the local prediction "
+                    "stack:  pip install 'pepdl[local] @ git+https://github.com/theGreatHerrLebert/pepdl.git'  "
+                    "— or pick a Koina RT model instead (timsim-rt --model koina:<name>)."
                 ) from e
             from scipy.interpolate import interp1d
 
@@ -177,8 +178,9 @@ if _TORCH_AVAILABLE:
                 from chronologer.model import initialize_chronologer_model
             except ImportError as e:
                 raise ImportError(
-                    "Chronologer base package not installed. Install from "
-                    "https://github.com/searlelab/chronologer (Apache-2.0)."
+                    "Chronologer (the default local RT model) is not installed. Install the local prediction "
+                    "stack:  pip install 'pepdl[local] @ git+https://github.com/theGreatHerrLebert/pepdl.git'  "
+                    "— or pick a Koina RT model instead (timsim-rt --model koina:<name>)."
                 ) from e
             if device is None:
                 device = "cuda" if torch.cuda.is_available() else "cpu"
