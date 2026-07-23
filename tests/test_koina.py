@@ -26,3 +26,17 @@ def test_koina_rt_predict():
     pred_cols = [c for c in out.columns if "rt" in c.lower() or "predict" in c.lower() or "irt" in c.lower()]
     assert pred_cols, f"no RT prediction column in {list(out.columns)}"
     assert np.isfinite(out[pred_cols[0]].to_numpy(dtype=float)).all()
+
+
+@pytest.mark.skipif(not _koina_up(), reason="Koina server unreachable")
+def test_koina_intensity_predict():
+    """The fragments-job intensity path: ModelFromKoina.predict with Koina's canonical column names."""
+    import pandas as pd
+    from pepdl.koina_models.access_models import ModelFromKoina
+    for seqs in (["PEPTIDEK"], ["PEPTIDEK", "SAMPLERPEPTIDER", "ELVISLIVESK"]):
+        df = pd.DataFrame({"peptide_sequences": [str(s) for s in seqs],
+                           "precursor_charges": [2] * len(seqs),
+                           "collision_energies": [30.0] * len(seqs)})
+        out = ModelFromKoina(model_name="Prosit_2020_intensity_HCD").predict(df)
+        assert {"annotation", "intensities"} <= set(out.columns)
+        assert len(out) > 0

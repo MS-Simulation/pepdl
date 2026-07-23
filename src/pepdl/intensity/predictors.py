@@ -296,7 +296,7 @@ class Prosit2023TimsTofWrapper(IonIntensityPredictor):
         )
 
         data['intensity_raw'] = list(I_pred)
-        I_pred = np.squeeze(reshape_dims(post_process_predicted_fragment_spectra(data)))
+        I_pred = (reshape_dims(post_process_predicted_fragment_spectra(data)))
 
         if flatten:
             I_pred = np.vstack([flatten_prosit_array(r) for r in I_pred])
@@ -364,7 +364,7 @@ class Prosit2023TimsTofWrapper(IonIntensityPredictor):
         )
 
         I_pred = list(I_pred)
-        I_pred = np.squeeze(reshape_dims(post_process_predicted_fragment_spectra(pd.DataFrame({
+        I_pred = (reshape_dims(post_process_predicted_fragment_spectra(pd.DataFrame({
             'sequence': sequences,
             'charge': charges,
             'collision_energy': collision_energies,
@@ -400,7 +400,7 @@ class Prosit2023TimsTofWrapper(IonIntensityPredictor):
         )
 
         I_pred = list(I_pred)
-        I_pred = np.squeeze(reshape_dims(post_process_predicted_fragment_spectra(pd.DataFrame({
+        I_pred = (reshape_dims(post_process_predicted_fragment_spectra(pd.DataFrame({
             'sequence': sequences,
             'charge': charges,
             'collision_energy': collision_energies,
@@ -452,9 +452,9 @@ def predict_fragment_intensities_with_koina(
     inputs = data.copy()
     if 'instrument_types' not in inputs.columns:
         inputs['instrument_types'] = 'TIMSTOF'
-    inputs.rename(columns={'peptide_sequences': seq_col,
-                           'precursor_charges': charge_col,
-                           'collision_energies': ce_col}, inplace=True)
+    inputs.rename(columns={seq_col: 'peptide_sequences',
+                           charge_col: 'precursor_charges',
+                           ce_col: 'collision_energies'}, inplace=True)
     intensity = intensity_model.predict(inputs)
 
     if verbose:
