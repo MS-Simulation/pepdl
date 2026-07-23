@@ -43,54 +43,8 @@ from pepdl._vendored import ccs_to_one_over_k0, one_over_k0_to_ccs, calculate_mz
 
 # Lazy imports for optional dependencies
 from pepdl.lazy_imports import (
-    get_sagepy_psm_utils,
     get_search_im_utils,
 )
-
-
-def predict_inverse_ion_mobility(
-    psm_collection: List,
-    refine_model: bool = True,
-    verbose: bool = False,
-) -> None:
-    """
-    Predict inverse ion mobility for a collection of peptide spectrum matches.
-
-    Note: This function requires sagepy (via imspy-search package).
-
-    Args:
-        psm_collection: A list of peptide spectrum matches (sagepy Psm objects).
-        refine_model: Whether to refine the model by fine-tuning it on the provided data.
-        verbose: Whether to print additional information during the prediction.
-
-    Returns:
-        None, the inverse ion mobility is set in the peptide spectrum matches in place.
-    """
-    Psm, psm_collection_to_pandas = get_sagepy_psm_utils()
-    generate_balanced_im_dataset = get_search_im_utils()
-
-    im_predictor = DeepPeptideIonMobilityApex(verbose=verbose)
-
-    if refine_model:
-        im_predictor.fine_tune_model(
-            psm_collection_to_pandas(generate_balanced_im_dataset(psm_collection)),
-            batch_size=128,
-            verbose=verbose,
-        )
-
-    # predict ion mobilities
-    inv_mob = im_predictor.simulate_ion_mobilities(
-        sequences=[
-            x.sequence_modified if not x.decoy else x.sequence_decoy_modified
-            for x in psm_collection
-        ],
-        charges=[x.charge for x in psm_collection],
-        mz=[x.mono_mz_calculated for x in psm_collection],
-    )
-
-    # set ion mobilities
-    for mob, ps in zip(inv_mob, psm_collection):
-        ps.inverse_ion_mobility_predicted = mob
 
 
 def _extract_prediction_mean(pred, key: Optional[str] = None):

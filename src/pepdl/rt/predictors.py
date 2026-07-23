@@ -43,60 +43,8 @@ from pepdl._vendored import linear_map
 
 # Lazy imports for optional dependencies
 from pepdl.lazy_imports import (
-    get_sagepy_psm_utils,
     get_search_rt_utils,
 )
-
-
-def predict_retention_time(
-    psm_collection: List,
-    refine_model: bool = True,
-    verbose: bool = False,
-) -> None:
-    """
-    Predict retention times for a collection of peptide-spectrum matches.
-
-    Note: This function requires sagepy (via imspy-search package).
-
-    Args:
-        psm_collection: A list of peptide-spectrum matches (sagepy Psm objects)
-        refine_model: Whether to refine the model
-        verbose: Whether to print verbose output
-
-    Returns:
-        None, retention times are set in the peptide-spectrum matches
-    """
-    Psm, psm_collection_to_pandas = get_sagepy_psm_utils()
-    generate_balanced_rt_dataset = get_search_rt_utils()
-
-    rt_predictor = DeepChromatographyApex(verbose=verbose)
-
-    rt_min = np.min([x.retention_time for x in psm_collection])
-    rt_max = np.max([x.retention_time for x in psm_collection])
-
-    for psm in psm_collection:
-        psm.retention_time_projected = linear_map(
-            psm.retention_time, rt_min, rt_max, 0, 60
-        )
-
-    if refine_model:
-        rt_predictor.fine_tune_model(
-            psm_collection_to_pandas(generate_balanced_rt_dataset(psm_collection)),
-            batch_size=128,
-            verbose=verbose,
-        )
-
-    # Predict retention times
-    rt_predicted = rt_predictor.simulate_separation_times(
-        sequences=[
-            x.sequence_modified if not x.decoy else x.sequence_decoy_modified
-            for x in psm_collection
-        ],
-    )
-
-    # Set the predicted retention times
-    for rt, ps in zip(rt_predicted, psm_collection):
-        ps.retention_time_predicted = rt
 
 
 def _extract_prediction_mean(pred, key: Optional[str] = None):
