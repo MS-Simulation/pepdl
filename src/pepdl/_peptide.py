@@ -1,4 +1,4 @@
-"""Peptide primitives for pepdl, backed by `mscorepy` (mscore + ms-chem) — NO imspy-core / imspy_connector.
+"""Peptide primitives for pepdl, backed by `mscorepy` (mscore + ms-chem) — NO imspy-core / mscorepy.
 
 Thin wrappers matching the imspy_core.data.peptide API the predictors rely on, so predictor code repoints
 by import only. Behaviour is a faithful port of imspy_core.data.peptide (the wrapper there only validated
