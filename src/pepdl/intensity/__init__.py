@@ -5,7 +5,6 @@ from pepdl.intensity.predictors import (
     Prosit2023TimsTofWrapper,
     DeepPeptideIntensityPredictor,
     load_deep_intensity_predictor,
-    get_collision_energy_calibration_factor,
     remove_unimod_annotation,
     predict_fragment_intensities_with_koina,
 )
@@ -30,7 +29,6 @@ __all__ = [
     # Loaders
     'load_deep_intensity_predictor',
     # Utilities
-    'get_collision_energy_calibration_factor',
     'remove_unimod_annotation',
     'post_process_predicted_fragment_spectra',
     'reshape_dims',

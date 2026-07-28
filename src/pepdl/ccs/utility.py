@@ -5,6 +5,7 @@ This module provides tokenization and data preparation utilities for CCS models.
 """
 
 import json
+import re
 import importlib.resources as resources
 from typing import List, Dict
 

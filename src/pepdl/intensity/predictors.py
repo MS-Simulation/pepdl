@@ -9,8 +9,7 @@ Classes:
     - IonIntensityPredictor: Abstract base class for intensity predictors
 """
 
-import os
-from typing import List, Tuple, Optional
+from typing import List, Optional
 
 from numpy.typing import NDArray
 import pandas as pd
@@ -108,27 +107,6 @@ def observed_fragments_to_intensity_target(
         if target[slot] >= 0:
             target[slot] = float(intensity) / max_intensity
     return target
-
-
-def get_collision_energy_calibration_factor(
-        sample: List,
-        model: 'Prosit2023TimsTofWrapper',
-        verbose: bool = False,
-) -> Tuple[float, List[float]]:
-    """DEPRECATED -- use :func:`calibrate_nce`.
-
-    BEHAVIOR CHANGED. This previously returned an *offset* added to each PSM's
-    ``collision_energy`` and -- a bug -- calibrated on the unmodified sequence.
-    It now delegates to :func:`calibrate_nce` and returns the **absolute** best
-    NCE. Callers must set ``collision_energy_calibrated = best_nce`` directly,
-    NOT ``collision_energy + factor``.
-
-    Returns:
-        Tuple[float, List[float]]: the absolute best NCE and the per-NCE mean
-        spectral angles.
-    """
-    calibration = calibrate_nce(model, sample, verbose=verbose)
-    return float(calibration["best_nce"]), [sa for _, sa in calibration["curve"]]
 
 
 class IonIntensityPredictor(ABC):
