@@ -1,12 +1,20 @@
 """Guard the externally-facing surface: every exported name must actually resolve, and the
 exported functions must not reference undefined globals. Both defects shipped once -- a deprecated
 `get_collision_energy_calibration_factor` delegating to a `calibrate_nce` that lives in pepdl-train,
-and `token_list_from_sequence` using `re` without importing it. Torch-free by design."""
+and `token_list_from_sequence` using `re` without importing it.
+
+Scope note: these modules are torch-free by design, but nothing in THIS file proves that. Every test
+here runs in the shared pytest process, where another test (or pytest itself) may already have
+imported torch, so a `"torch" not in sys.modules` assertion here would be meaningless. The real
+independence gate is `test_import_gate.py`: it imports the inference subpackages in a *fresh
+subprocess* and asserts torch/imspy/koina/numba stayed unimported. Keep that proof there; this file
+only checks that the exported names resolve."""
 import importlib
 import pytest
 
-# Subpackages that must import without torch/koina/sagepy installed.
-TORCH_FREE_MODULES = [
+# Subpackages whose exports must resolve. (That they import without torch/koina/sagepy is proven in
+# test_import_gate.py, in a subprocess — see the scope note above.)
+NAME_RESOLUTION_MODULES = [
     "pepdl",
     "pepdl.ccs",
     "pepdl.ccs.utility",
@@ -17,7 +25,7 @@ TORCH_FREE_MODULES = [
 ]
 
 
-@pytest.mark.parametrize("name", TORCH_FREE_MODULES)
+@pytest.mark.parametrize("name", NAME_RESOLUTION_MODULES)
 def test_every_exported_name_resolves(name):
     mod = importlib.import_module(name)
     missing = [s for s in getattr(mod, "__all__", []) if not hasattr(mod, s)]
