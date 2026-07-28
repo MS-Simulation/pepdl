@@ -3,6 +3,8 @@
 from pepdl.intensity.predictors import (
     IonIntensityPredictor,
     Prosit2023TimsTofWrapper,
+    DeepPeptideIntensityPredictor,
+    load_deep_intensity_predictor,
     get_collision_energy_calibration_factor,
     remove_unimod_annotation,
     predict_fragment_intensities_with_koina,
@@ -24,6 +26,9 @@ __all__ = [
     # Predictors
     'IonIntensityPredictor',
     'Prosit2023TimsTofWrapper',
+    'DeepPeptideIntensityPredictor',
+    # Loaders
+    'load_deep_intensity_predictor',
     # Utilities
     'get_collision_energy_calibration_factor',
     'remove_unimod_annotation',

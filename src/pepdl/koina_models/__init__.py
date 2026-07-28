@@ -1,7 +1,7 @@
 """Koina model access module for remote prediction services.
 
 Note: Requires koinapy optional dependency. Install with:
-    pip install imspy-predictors[koina]
+    pip install pepdl[koina]
 
 Features:
 - Server availability checking

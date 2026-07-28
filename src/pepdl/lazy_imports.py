@@ -2,7 +2,7 @@
 Lazy imports for optional dependencies.
 
 This module provides lazy import functions for packages that are optional
-dependencies (e.g., sagepy from imspy-search). This allows imspy-predictors
+dependencies (e.g., sagepy from imspy-search). This allows pepdl
 to work without these dependencies for basic functionality, while still
 providing integration when they are available.
 """

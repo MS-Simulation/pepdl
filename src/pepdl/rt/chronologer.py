@@ -517,7 +517,7 @@ if _TORCH_AVAILABLE:
                 out[i] = float(p)
             return out
 
-        # API parity stub — pandas frontend used by some imspy-predictors
+        # API parity stub — pandas frontend used by some pepdl
         # callers. Wraps ``simulate_separation_times`` to fill a column.
         def simulate_separation_times_pandas(self, data, sequence_col: str = "sequence_modified"):
             import pandas as pd

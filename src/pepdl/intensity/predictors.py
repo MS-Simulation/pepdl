@@ -110,69 +110,6 @@ def observed_fragments_to_intensity_target(
     return target
 
 
-def _ion_to_text(ion) -> str:
-    text = str(ion).lower()
-    if text in ("b", "y"):
-        return text
-    if text in ("iontype(b)", "iontype(y)"):
-        return text[-2]
-    if text.endswith(" b") or text.endswith(".b"):
-        return "b"
-    if text.endswith(" y") or text.endswith(".y"):
-        return "y"
-    return text[-1:]
-
-
-def observed_fragments_to_intensity_target(
-    sequence: str,
-    precursor_charge: int,
-    fragments,
-) -> np.ndarray:
-    """Build a native Prosit-layout target vector from observed Sage fragments.
-
-    Output layout is ordinal-major:
-    [y1+1, y1+2, y1+3, b1+1, b1+2, b1+3, y2+1, ...].
-    Impossible fragments are marked -1 for masked spectral loss; valid but
-    unmatched fragments remain zero.
-    """
-    sequence_length = len(remove_unimod_annotation(sequence))
-    target = np.zeros(174, dtype=np.float32)
-
-    target_3d = target.reshape(29, 6)
-    max_frag_pos = max(sequence_length - 1, 0)
-    if max_frag_pos < 29:
-        target_3d[max_frag_pos:, :] = -1.0
-    for ion_charge in range(1, 4):
-        if ion_charge > int(precursor_charge):
-            target_3d[:, ion_charge - 1] = -1.0
-            target_3d[:, ion_charge + 2] = -1.0
-
-    intensities = np.asarray(fragments.intensities, dtype=np.float32)
-    if intensities.size == 0:
-        return target
-    max_intensity = float(np.max(intensities))
-    if max_intensity <= 0:
-        return target
-
-    for ion_type, ordinal, charge, intensity in zip(
-        fragments.ion_types,
-        fragments.fragment_ordinals,
-        fragments.charges,
-        intensities,
-    ):
-        ion = _ion_to_text(ion_type)
-        ordinal = int(ordinal)
-        charge = int(charge)
-        if ion not in ("b", "y"):
-            continue
-        if not (1 <= ordinal <= 29 and 1 <= charge <= 3):
-            continue
-        slot = (ordinal - 1) * 6 + (charge - 1 if ion == "y" else 3 + charge - 1)
-        if target[slot] >= 0:
-            target[slot] = float(intensity) / max_intensity
-    return target
-
-
 def get_collision_energy_calibration_factor(
         sample: List,
         model: 'Prosit2023TimsTofWrapper',
@@ -493,7 +430,7 @@ def get_model_path(relative_path: str):
     if model_path.exists():
         return model_path
 
-    # Try package root checkpoints (packages/imspy-predictors/checkpoints)
+    # Try package root checkpoints (repo-root ./checkpoints)
     package_root = package_dir.parent.parent
     root_path = package_root / 'checkpoints' / relative_path
     if root_path.exists():
