@@ -8,13 +8,13 @@ version = "0.1.0"
 description = "Peptide deep-learning property predictors (CCS, RT, MS2 intensity, charge) — inference. timsTOF-free, torch-optional, backed by mscorepy primitives."
 requires-python = ">=3.11"
 license = { text = "MIT" }
-dependencies = ["mscorepy @ git+https://github.com/theGreatHerrLebert/mscore.git#subdirectory=mscorepy", "numpy>=1.21", "pandas>=1.3", "scipy>=1.7", "tqdm>=4.6"]
+dependencies = ["mscorepy @ git+https://github.com/MS-Simulation/mscore.git@3f1824427aceca5c5b2e429340177eeae1649bb0#subdirectory=mscorepy", "numpy>=1.21", "pandas>=1.3", "scipy>=1.7", "tqdm>=4.6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-local = ["torch>=2.0", "chronologer @ git+https://github.com/searlelab/chronologer", "pytz"]   # on-device stack incl. the default RT (searlelab Chronologer)
+local = ["torch>=2.0", "chronologer @ git+https://github.com/searlelab/chronologer@e518130ceb634e3b2cac240109f201fe795e553e", "pytz"]   # on-device stack incl. the default RT (searlelab Chronologer)
 koina = ["koinapy>=0.0.10"]     # remote (torch-free, connector-free)
-rt = ["chronologer @ git+https://github.com/searlelab/chronologer", "pytz", "torch>=2.0"]   # just the default RT backend (searlelab Chronologer + torch)
+rt = ["chronologer @ git+https://github.com/searlelab/chronologer@e518130ceb634e3b2cac240109f201fe795e553e", "pytz", "torch>=2.0"]   # just the default RT backend (searlelab Chronologer + torch)
 
 [tool.hatch.metadata]
 allow-direct-references = true

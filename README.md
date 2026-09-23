@@ -12,7 +12,7 @@ Peptide deep-learning **property predictors** for mass spectrometry — **infere
 | **Charge state / flyability** | `pepdl.ionization` | `DeepChargeStateDistribution`, `BinomialChargeStateDistributionModel` | `predict_peptide_flyability_with_koina` |
 
 Training code is **not** here — it lives in the sibling repo
-[`pepdl-train`](https://github.com/theGreatHerrLebert/pepdl-train). This package only loads
+[`pepdl-train`](https://github.com/MS-Simulation/pepdl-train). This package only loads
 pretrained weights and runs forward passes.
 
 ## Two backends
@@ -29,7 +29,7 @@ with an actionable `pip install 'pepdl[local]'` hint if torch is missing.
 ## Independence
 
 `pepdl` is **imspy-free** and **timsTOF-free**. Chemistry, peptide, and fragment-series primitives
-come from [`mscorepy`](https://github.com/theGreatHerrLebert/mscore) — a lean Rust (PyO3) wheel
+come from [`mscorepy`](https://github.com/MS-Simulation/mscore) — a lean Rust (PyO3) wheel
 wrapping `mscore` + `ms-chem`. This is enforced by `tests/test_import_gate.py`, which imports the
 inference surface in a fresh subprocess and asserts that none of `imspy_*`, `ms_io`, `torch`,
 `koinapy`, or `numba` ended up in `sys.modules`.

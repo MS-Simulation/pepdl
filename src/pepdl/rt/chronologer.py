@@ -138,7 +138,7 @@ if _TORCH_AVAILABLE:
             except ImportError as e:
                 raise ImportError(
                     "Chronologer (the default local RT model) is not installed. Install the local prediction "
-                    "stack:  pip install 'pepdl[local] @ git+https://github.com/theGreatHerrLebert/pepdl.git'  "
+                    "stack:  pip install 'pepdl[local] @ git+https://github.com/MS-Simulation/pepdl.git'  "
                     "— or pick a Koina RT model instead (timsim-rt --model koina:<name>)."
                 ) from e
             from scipy.interpolate import interp1d
@@ -179,7 +179,7 @@ if _TORCH_AVAILABLE:
             except ImportError as e:
                 raise ImportError(
                     "Chronologer (the default local RT model) is not installed. Install the local prediction "
-                    "stack:  pip install 'pepdl[local] @ git+https://github.com/theGreatHerrLebert/pepdl.git'  "
+                    "stack:  pip install 'pepdl[local] @ git+https://github.com/MS-Simulation/pepdl.git'  "
                     "— or pick a Koina RT model instead (timsim-rt --model koina:<name>)."
                 ) from e
             if device is None:
