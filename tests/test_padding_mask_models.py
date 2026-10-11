@@ -100,14 +100,24 @@ def test_intensity_passes_the_mask_on_every_batch():
 # ── behaviour, with the shipped weights ─────────────────────────────────────────────────────────
 
 
+def _weights_or_skip(model_name):
+    """Skip when the checkpoint cannot be had here (offline, or a bad download). ONLY that: the
+    predictor itself is constructed outside any try, so a real failure (a changed signature, a
+    state-dict mismatch) fails the test instead of turning into a skip."""
+    from pepdl.pretrained.hub import ensure_model
+
+    try:
+        ensure_model(model_name)
+    except (OSError, RuntimeError) as e:
+        pytest.skip(f"{model_name} unavailable: {e}")
+
+
 @pytest.fixture(scope="module")
 def ccs_apex():
     from pepdl.ccs import DeepPeptideIonMobilityApex
 
-    try:
-        return DeepPeptideIonMobilityApex(verbose=False)
-    except Exception as e:  # weights absent and not downloadable here
-        pytest.skip(f"CCS weights unavailable: {e}")
+    _weights_or_skip("ccs/best_model.pt")
+    return DeepPeptideIonMobilityApex(verbose=False)
 
 
 def test_ccs_does_not_depend_on_the_rest_of_the_batch(ccs_apex):
@@ -124,12 +134,11 @@ def test_ccs_does_not_depend_on_the_rest_of_the_batch(ccs_apex):
 def test_other_heads_do_not_depend_on_the_rest_of_the_batch(model_attr):
     if model_attr == "intensity":
         from pepdl.intensity.predictors import DeepPeptideIntensityPredictor as P
+        _weights_or_skip("intensity/best_model.pt")
     else:
         from pepdl.rt.predictors import DeepChromatographyApex as P
-    try:
-        apex = P()
-    except Exception as e:
-        pytest.skip(f"{model_attr} weights unavailable: {e}")
+        _weights_or_skip("rt/best_model.pt")
+    apex = P()
     seq = "LVNELTEFAK"
     if model_attr == "intensity":
         alone = apex._predict_batch([seq], [2], [0.3])[0]
@@ -157,3 +166,46 @@ def test_ccs_matches_held_out_measurements_per_charge(ccs_apex):
     assert mae[3] <= 20 and mae[4] <= 20, report
     weighted = (0.67 * mae[2] + 0.27 * mae[3] + 0.05 * mae[4]) / 0.99
     assert weighted <= 10, (weighted, report)
+
+
+# ── fragment intensities vs MEASURED timsTOF spectra ─────────────────────────────────────────────
+#
+# Fixture: tests/data/timstof_ms2_fixture.parquet, 300 spectra drawn with random_state=11 from the
+# held-out test split of Wilhelmlab/timsTOF-ms2 (huggingface, CC-BY-4.0), the dataset the shipped
+# intensity model was fine-tuned on. `intensities_raw` is the 174-slot measured vector (-1 = an ion
+# that cannot exist), `collision_energy_aligned_normed` the CE exactly as training fed it.
+
+MS2_FIXTURE = Path(__file__).parent / "data" / "timstof_ms2_fixture.parquet"
+
+
+def _spectral_angle(y_true, y_pred):
+    """1 - training's masked spectral distance (pepdl-train losses.masked_spectral_distance)."""
+    eps = 1e-7
+    t, q = torch.as_tensor(y_true), torch.as_tensor(y_pred)
+    pm = ((t + 1) * q) / (t + 1 + eps)
+    tm = ((t + 1) * t) / (t + 1 + eps)
+    cos = (torch.nn.functional.normalize(pm, dim=-1) * torch.nn.functional.normalize(tm, dim=-1)).sum(-1)
+    return (1 - 2 * torch.arccos(cos.clamp(-1 + eps, 1 - eps)) / np.pi).numpy()
+
+
+def _measured_ms2():
+    import pandas as pd
+
+    d = pd.read_parquet(MS2_FIXTURE)
+    args = (d.modified_sequence.tolist(), d.charge.tolist(),
+            d.collision_energy_aligned_normed.tolist())
+    return args, np.stack(d.intensities_raw.to_numpy()).astype(np.float32)
+
+
+def _intensity_predictor(**kw):
+    from pepdl.intensity.predictors import DeepPeptideIntensityPredictor
+
+    _weights_or_skip("intensity/best_model.pt")
+    return DeepPeptideIntensityPredictor(verbose=False, **kw)
+
+
+def test_intensity_matches_measured_timstof_spectra():
+    """Masked: median spectral angle 0.826 on this fixture. Unmasked (pepdl <= 75420c5): 0.443."""
+    args, y = _measured_ms2()
+    sa = _spectral_angle(y, _intensity_predictor()._predict_batch(*args).reshape(len(y), -1))
+    assert np.median(sa) >= 0.78, np.median(sa)
