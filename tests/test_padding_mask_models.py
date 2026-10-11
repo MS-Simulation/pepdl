@@ -170,12 +170,12 @@ def test_ccs_matches_held_out_measurements_per_charge(ccs_apex):
 
 # ── fragment intensities vs MEASURED timsTOF spectra ─────────────────────────────────────────────
 #
-# Fixture: tests/data/timstof_ms2_fixture.parquet, 300 spectra drawn with random_state=11 from the
+# Fixture: tests/data/timstof_ms2_fixture.npz (numpy only, no pickle), 300 spectra drawn with random_state=11 from the
 # held-out test split of Wilhelmlab/timsTOF-ms2 (huggingface, CC-BY-4.0), the dataset the shipped
 # intensity model was fine-tuned on. `intensities_raw` is the 174-slot measured vector (-1 = an ion
 # that cannot exist), `collision_energy_aligned_normed` the CE exactly as training fed it.
 
-MS2_FIXTURE = Path(__file__).parent / "data" / "timstof_ms2_fixture.parquet"
+MS2_FIXTURE = Path(__file__).parent / "data" / "timstof_ms2_fixture.npz"
 
 
 def _spectral_angle(y_true, y_pred):
@@ -189,12 +189,10 @@ def _spectral_angle(y_true, y_pred):
 
 
 def _measured_ms2():
-    import pandas as pd
-
-    d = pd.read_parquet(MS2_FIXTURE)
-    args = (d.modified_sequence.tolist(), d.charge.tolist(),
-            d.collision_energy_aligned_normed.tolist())
-    return args, np.stack(d.intensities_raw.to_numpy()).astype(np.float32)
+    with np.load(MS2_FIXTURE, allow_pickle=False) as d:
+        args = (d["modified_sequence"].tolist(), d["charge"].tolist(),
+                d["collision_energy_aligned_normed"].tolist())
+        return args, d["intensities_raw"].astype(np.float32)
 
 
 def _intensity_predictor(**kw):
