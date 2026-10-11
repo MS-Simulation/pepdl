@@ -26,6 +26,7 @@ from pepdl.intensity.utility import (
 from pepdl._peptide import PeptideProductIonSeriesCollection, PeptideSequence
 from pepdl._vendored import remove_unimod_annotation
 from pepdl.utility import InMemoryCheckpoint
+from pepdl.utilities.padding import token_ids_and_mask
 
 # Lazy imports for optional dependencies
 from pepdl.lazy_imports import (
@@ -528,24 +529,18 @@ class DeepPeptideIntensityPredictor(IonIntensityPredictor):
         charges: List[int],
         collision_energies: List[float],
     ):
-        """Prepare inputs for the model."""
-        # Get max_seq_len from model
+        """``(tokens, padding_mask, charge, collision_energy)`` tensors for one batch.
+
+        The padding mask is what the model was trained with and must reach the forward call;
+        see :mod:`pepdl.utilities.padding`. The width is the model's ``max_seq_len``.
+        """
         max_seq_len = getattr(self.model, 'max_seq_len', 50)
         if hasattr(self.model, 'encoder') and hasattr(self.model.encoder, 'max_seq_len'):
             max_seq_len = self.model.encoder.max_seq_len
 
-        # Tokenize sequences
-        result = self.tokenizer(sequences, padding=True, return_tensors='pt')
-        tokens = result['input_ids']
-
-        # Pad to max length
-        if tokens.shape[1] < max_seq_len:
-            padding = self._torch.zeros(
-                tokens.shape[0], max_seq_len - tokens.shape[1], dtype=self._torch.long
-            )
-            tokens = self._torch.cat([tokens, padding], dim=1)
-        elif tokens.shape[1] > max_seq_len:
-            tokens = tokens[:, :max_seq_len]
+        ids, mask = token_ids_and_mask(self.tokenizer, list(sequences), pad_len=max_seq_len)
+        tokens = self._torch.as_tensor(ids, dtype=self._torch.long)
+        padding_mask = self._torch.as_tensor(mask, dtype=self._torch.bool)
 
         # Charge as integer tensor (model handles one-hot internally)
         charge_tensor = self._torch.tensor(charges, dtype=self._torch.long)
@@ -553,7 +548,7 @@ class DeepPeptideIntensityPredictor(IonIntensityPredictor):
         # Collision energies (already normalized in calling function)
         ce_tensor = self._torch.tensor(collision_energies, dtype=self._torch.float32)
 
-        return tokens, charge_tensor, ce_tensor
+        return tokens, padding_mask, charge_tensor, ce_tensor
 
     def simulate_ion_intensities_pandas_batched(
         self,
@@ -682,11 +677,12 @@ class DeepPeptideIntensityPredictor(IonIntensityPredictor):
             batch_charges = charges[i:i + batch_size]
             batch_ces = collision_energies[i:i + batch_size]
 
-            tokens, charge_onehot, ce_tensor = self._preprocess(
+            tokens, padding_mask, charge_onehot, ce_tensor = self._preprocess(
                 batch_seqs, batch_charges, batch_ces
             )
 
             tokens = tokens.to(self._device)
+            padding_mask = padding_mask.to(self._device)
             charge_onehot = charge_onehot.to(self._device)
             ce_tensor = ce_tensor.to(self._device)
 
@@ -695,6 +691,7 @@ class DeepPeptideIntensityPredictor(IonIntensityPredictor):
                     tokens,
                     charge=charge_onehot,
                     collision_energy=ce_tensor,
+                    padding_mask=padding_mask,
                 )
 
             # Extract intensity output

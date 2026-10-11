@@ -20,6 +20,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+
+from pepdl.utilities.padding import token_ids_and_mask
 from scipy.optimize import curve_fit
 
 # Import PyTorch
@@ -426,94 +428,23 @@ class DeepPeptideIonMobilityApex(PeptideIonMobilityApex):
 
     def _preprocess_sequences(
         self, sequences: List[str], pad_len: int = 50
-    ) -> torch.Tensor:
-        """Tokenize and pad sequences."""
-        result = self.tokenizer(sequences, padding=True, return_tensors='pt')
-        tokens = result['input_ids']
-
-        # Pad to fixed length
-        if tokens.shape[1] < pad_len:
-            padding = torch.zeros(tokens.shape[0], pad_len - tokens.shape[1], dtype=torch.long)
-            tokens = torch.cat([tokens, padding], dim=1)
-        elif tokens.shape[1] > pad_len:
-            tokens = tokens[:, :pad_len]
-
-        return tokens.to(self._device)
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """``(tokens, padding_mask)`` on the device, in one pass (see ``_token_ids``)."""
+        ids, mask = self._token_ids(sequences, pad_len=pad_len, chunk_size=max(len(sequences), 1))
+        return (torch.as_tensor(ids, dtype=torch.long, device=self._device),
+                torch.as_tensor(mask, dtype=torch.bool, device=self._device))
 
     def _token_ids(
         self, sequences: List[str], pad_len: int = 50, chunk_size: int = 65536
-    ) -> NDArray:
-        """``_preprocess_sequences`` for an arbitrarily long list, at bounded memory.
+    ) -> Tuple[NDArray, NDArray]:
+        """``(ids, padding_mask)`` on the host, built ``chunk_size`` rows at a time.
 
-        Returns the same token matrix, on the host, in the narrowest integer dtype the vocabulary
-        fits — but built from ``chunk_size`` sequences at a time.
-
-        # Why this exists
-
-        ``ProformaTokenizer.__call__`` is a whole-batch API: it turns the input into a
-        ``List[List[str]]`` of per-token strings, then into two ``List[List[int]]`` (the ids and an
-        attention mask this path never reads), then into two int64 tensors. At ~18 tokens per
-        peptide that is ~150M short-lived Python objects for 8M sequences, and it is what made
-        ``timsim-ccs`` the pipeline's memory wall: 24.4 GB RSS + 1.8 GB swap on a 9M-precursor HeLa
-        digest, SIGKILLed on a 31 GB box before a single batch had been predicted. Everything else
-        in that job — the parquet reads, the peptide merge, the dedup, the scatter-back — accounts
-        for ~4 GB of it. Chunking this one call is the whole fix.
-
-        # Why the global width has to be threaded through
-
-        ``pad_token_id`` is **not** 0. ``__call__(padding=True)`` pads to the longest tokenisation
-        *in the list it is handed*, and ``_preprocess_sequences`` then zero-fills from there up to
-        ``pad_len``. So a row's tail is ``[pad_id] * (width - len) + [0] * (pad_len - width)``,
-        where ``width`` is a property of the WHOLE input. Tokenising per chunk and stacking would
-        give each chunk its own ``width`` — and the encoder reads those positions, so the predicted
-        CCS would silently change. Hence: one pass records the ids and the lengths, ``width`` falls
-        out of the lengths, and the PAD-id fill is applied afterwards.
+        Tokenising the whole input in one ``ProformaTokenizer.__call__`` was the pipeline's memory
+        wall (24 GB RSS for 9M precursors in ``timsim-ccs``), hence the chunking. The mask is what
+        the model was trained with and must be passed on every forward call; see
+        :mod:`pepdl.utilities.padding`.
         """
-        pad_id = int(self.tokenizer.pad_token_id)
-        n = len(sequences)
-        # int16 halves the resident matrix (830 MB vs 1.7 GB at 8.3M rows). `vocab_size` is a
-        # COUNT, though, and is only a valid ceiling on the ids under a dense-id invariant that
-        # the tokenizer API does not promise: a sparse or externally-assigned vocabulary could
-        # report a small size and still emit an id past int16. So the guess below is checked
-        # against the ids actually observed, per chunk, and widened if it was ever wrong. Do not
-        # replace that check with a try/except OverflowError — NumPy >= 2 raises on an
-        # out-of-range assignment, but NumPy 1.x casts it silently (40000 -> -25536), which would
-        # corrupt the padding region the encoder reads and move the predicted CCS.
-        narrow = max(int(self.tokenizer.vocab_size), pad_id) < 2 ** 15
-        ids = np.zeros((n, pad_len), dtype=np.int16 if narrow else np.int32)
-        lengths = np.zeros(n, dtype=np.int64)
-
-        for start in range(0, n, chunk_size):
-            chunk = sequences[start:start + chunk_size]
-            # pad=False: the per-chunk width is deliberately NOT applied here (see above), and the
-            # attention mask is the half of __call__'s work that this path throws away.
-            encoded, _ = self.tokenizer.encode_batch(
-                self.tokenizer.tokenize_batch(chunk), pad=False
-            )
-            if ids.dtype == np.int16:
-                # One C-level pass per chunk (~65k rows), negligible beside tokenising them.
-                hi = max((max(row) for row in encoded if row), default=0)
-                lo = min((min(row) for row in encoded if row), default=0)
-                if hi > 2 ** 15 - 1 or lo < -(2 ** 15):
-                    ids = ids.astype(np.int32)
-            for j, row in enumerate(encoded):
-                lengths[start + j] = len(row)
-                keep = row[:pad_len]
-                ids[start + j, :len(keep)] = keep
-
-        if n == 0:
-            return ids
-
-        # The width a single whole-list call would have padded to, clipped by pad_len: a longer
-        # tokenisation is truncated and so contributes no PAD region at all.
-        width = min(int(lengths.max()), pad_len)
-        clipped = np.minimum(lengths, pad_len)
-        col = np.arange(pad_len)
-        for start in range(0, n, chunk_size):  # chunked so the boolean mask stays bounded too
-            stop = min(start + chunk_size, n)
-            block = ids[start:stop]
-            block[(col[None, :] >= clipped[start:stop, None]) & (col[None, :] < width)] = pad_id
-        return ids
+        return token_ids_and_mask(self.tokenizer, sequences, pad_len=pad_len, chunk_size=chunk_size)
 
     def simulate_ion_mobilities(
         self,
@@ -583,8 +514,9 @@ class DeepPeptideIonMobilityApex(PeptideIonMobilityApex):
 
         # Prepare data on the filtered subset. The token matrix is built chunkwise and kept on the
         # host in a narrow dtype, then moved to the device one batch at a time: tokenising all of it
-        # in one call is what made this the pipeline's memory wall (see _token_ids).
-        token_ids = self._token_ids(valid_sequences)
+        # in one call is what made this the pipeline's memory wall (see _token_ids). The padding
+        # mask goes to every forward call: the model was trained with it (pepdl.utilities.padding).
+        token_ids, padding_mask = self._token_ids(valid_sequences)
         mz_tensor = torch.tensor(valid_mz, dtype=torch.float32, device=self._device)
         charges_onehot = F.one_hot(
             torch.tensor(valid_charges, dtype=torch.long, device=self._device) - 1,
@@ -599,6 +531,9 @@ class DeepPeptideIonMobilityApex(PeptideIonMobilityApex):
                 batch_tokens = torch.as_tensor(
                     token_ids[i:i + batch_size], dtype=torch.long, device=self._device
                 )
+                batch_mask = torch.as_tensor(
+                    padding_mask[i:i + batch_size], dtype=torch.bool, device=self._device
+                )
                 batch_mz = mz_tensor[i:i + batch_size]
                 batch_charges = charges_onehot[i:i + batch_size]
 
@@ -609,12 +544,13 @@ class DeepPeptideIonMobilityApex(PeptideIonMobilityApex):
                         batch_tokens,
                         batch_mz,
                         torch.argmax(batch_charges, dim=1) + 1,
+                        padding_mask=batch_mask,
                     )
                     ccs = _extract_prediction_mean(ccs_pred, "ccs")
                     ccs_std = _extract_prediction_std(ccs_pred, "ccs")
                 else:
                     # Legacy PyTorchCCSPredictor
-                    result = self.model(batch_mz, batch_charges, batch_tokens)
+                    result = self.model(batch_mz, batch_charges, batch_tokens, padding_mask=batch_mask)
                     ccs = _extract_prediction_mean(result, "ccs")
                     ccs_std = _extract_prediction_std(result, "ccs")
 
