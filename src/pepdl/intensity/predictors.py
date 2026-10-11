@@ -472,6 +472,12 @@ class DeepPeptideIntensityPredictor(IonIntensityPredictor):
         tokenizer: Tokenizer for sequences (optional, will load default if None)
         verbose: Whether to print progress
         device: Device to run on ('cpu', 'cuda', 'mps', or None for auto)
+        instrument: Instrument type for the model's instrument embedding, one of
+            ``pepdl.models.heads.INSTRUMENT_TYPES`` (e.g. ``"timstof"``). ``None`` (default) passes no
+            instrument, which the model treats as ``"unknown"``. The shipped model was fine-tuned on
+            timsTOF spectra labelled ``"timstof"``; on held-out measured timsTOF spectra (the
+            Wilhelmlab/timsTOF-ms2 test split) the median spectral angle is 0.834 with ``None`` and
+            0.857 with ``"timstof"``.
 
     Example:
         >>> predictor = DeepPeptideIntensityPredictor()
@@ -488,9 +494,20 @@ class DeepPeptideIntensityPredictor(IonIntensityPredictor):
         tokenizer=None,
         verbose: bool = True,
         device: Optional[str] = None,
+        instrument: Optional[str] = None,
     ):
         from pepdl.utility import require_torch
         self._torch = require_torch("DeepPeptideIntensityPredictor (local intensity model)")
+
+        # Resolved before any weights load, so a typo fails fast. `get_instrument_id` maps an
+        # unknown name to 0 ("unknown") silently; here an unknown name is an error instead.
+        self.instrument_id = None
+        if instrument is not None:
+            from pepdl.models.heads import INSTRUMENT_TO_ID
+            if instrument not in INSTRUMENT_TO_ID:
+                raise ValueError(
+                    f"unknown instrument {instrument!r}; expected one of {sorted(INSTRUMENT_TO_ID)}")
+            self.instrument_id = INSTRUMENT_TO_ID[instrument]
 
         super().__init__()
 
@@ -686,12 +703,19 @@ class DeepPeptideIntensityPredictor(IonIntensityPredictor):
             charge_onehot = charge_onehot.to(self._device)
             ce_tensor = ce_tensor.to(self._device)
 
+            extra = {}
+            instrument_id = getattr(self, "instrument_id", None)
+            if instrument_id is not None:
+                extra["instrument"] = self._torch.full(
+                    (tokens.shape[0],), instrument_id, dtype=self._torch.long, device=self._device)
+
             with self._torch.no_grad():
                 outputs = self.model(
                     tokens,
                     charge=charge_onehot,
                     collision_energy=ce_tensor,
                     padding_mask=padding_mask,
+                    **extra,
                 )
 
             # Extract intensity output
